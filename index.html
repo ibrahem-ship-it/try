@@ -1,0 +1,471 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>المتحدث الذكي - المقابلة الوزارية</title>
+    <!-- استدعاء Tailwind CSS للتصميم -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- استدعاء FontAwesome للأيقونات -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- تخصيص الخطوط والألوان -->
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700&display=swap');
+        body {
+            font-family: 'Cairo', sans-serif;
+            background-color: #0f172a; /* لون خلفية داكن ورسمي */
+            color: #f8fafc;
+        }
+        /* أنيميشن زر المايكروفون عند التحدث */
+        .mic-pulse {
+            animation: pulse-ring 1.5s cubic-bezier(0.215, 0.61, 0.355, 1) infinite;
+        }
+        @keyframes pulse-ring {
+            0% { box-shadow: 0 0 0 0 rgba(59, 130, 246, 0.7); }
+            70% { box-shadow: 0 0 0 20px rgba(59, 130, 246, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(59, 130, 246, 0); }
+        }
+        /* تصميم شريط التمرير */
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: #1e293b; }
+        ::-webkit-scrollbar-thumb { background: #475569; border-radius: 4px; }
+    </style>
+</head>
+<body class="h-screen flex flex-col overflow-hidden">
+
+    <!-- شريط الإشعارات (بديل لـ alert) -->
+    <div id="toast-container" class="fixed top-4 left-1/2 transform -translate-x-1/2 z-50 flex flex-col gap-2 w-11/12 max-w-md"></div>
+
+    <!-- شريط العنوان -->
+    <header class="bg-slate-900 shadow-md p-4 flex justify-between items-center border-b border-slate-700 relative z-10">
+        <div class="flex items-center gap-3">
+            <div class="w-10 h-10 bg-blue-600 rounded-full flex items-center justify-center text-white shadow-lg shadow-blue-500/30">
+                <i class="fa-solid fa-microphone-lines text-xl"></i>
+            </div>
+            <h1 class="text-xl font-bold tracking-wide">نظام المقابلة التفاعلي</h1>
+        </div>
+        <button id="openSettingsBtn" class="text-slate-400 hover:text-white transition bg-slate-800 p-2 rounded-lg hover:bg-slate-700">
+            <i class="fa-solid fa-gear text-xl"></i>
+        </button>
+    </header>
+
+    <!-- واجهة المحادثة الرئيسية -->
+    <main class="flex-1 flex flex-col p-4 sm:p-6 overflow-hidden relative">
+        
+        <!-- منطقة عرض المحادثة -->
+        <div id="chatBox" class="flex-1 overflow-y-auto mb-6 flex flex-col gap-4 p-2">
+            <div class="text-center text-slate-500 text-sm mt-10">
+                <i class="fa-solid fa-shield-halved text-2xl mb-2 block"></i>
+                النظام جاهز وآمن. المفاتيح محفوظة على هذا الجهاز فقط.
+            </div>
+        </div>
+
+        <!-- منطقة التحكم (المايكروفون والحالة) -->
+        <div class="bg-slate-800 rounded-2xl p-6 shadow-xl border border-slate-700 flex flex-col items-center justify-center shrink-0">
+            
+            <div id="statusText" class="text-slate-400 mb-6 font-semibold tracking-wide h-6 flex items-center gap-2">
+                جاهز لبدء المحادثة
+            </div>
+
+            <button id="micBtn" class="w-24 h-24 bg-blue-600 hover:bg-blue-500 rounded-full flex items-center justify-center transition-all duration-300 shadow-lg shadow-blue-600/40 relative z-10">
+                <i id="micIcon" class="fa-solid fa-microphone text-4xl text-white"></i>
+            </button>
+            <p class="text-slate-500 text-xs mt-4">اضغط للتحدث، واضغط مرة أخرى للإيقاف</p>
+        </div>
+    </main>
+
+    <!-- نافذة الإعدادات (Modal) -->
+    <div id="settingsModal" class="fixed inset-0 bg-black/80 backdrop-blur-sm z-40 hidden flex justify-center items-center p-4">
+        <div class="bg-slate-800 rounded-2xl w-full max-w-2xl border border-slate-600 shadow-2xl flex flex-col max-h-[90vh]">
+            <div class="p-5 border-b border-slate-700 flex justify-between items-center bg-slate-800/50 rounded-t-2xl">
+                <h2 class="text-xl font-bold"><i class="fa-solid fa-sliders text-blue-500 mr-2"></i> إعدادات النظام السرية</h2>
+                <button id="closeSettingsBtn" class="text-slate-400 hover:text-white transition"><i class="fa-solid fa-xmark text-xl"></i></button>
+            </div>
+            
+            <div class="p-6 overflow-y-auto flex-1 custom-scrollbar space-y-5">
+                <div class="bg-slate-900/50 p-4 rounded-xl border border-slate-700/50">
+                    <label class="block text-sm font-semibold mb-2 text-slate-300">مفتاح Gemini API (Flash 1.5)</label>
+                    <input type="password" id="geminiKey" class="w-full bg-slate-900 border border-slate-600 rounded-lg p-3 text-white focus:outline-none focus:border-blue-500 transition" placeholder="AIzaSy...">
+                </div>
+
+                <div class="bg-slate-900/50 p-4 rounded-xl border border-slate-700/50">
+                    <label class="block text-sm font-semibold mb-2 text-slate-300">مفتاح ElevenLabs API</label>
+                    <input type="password" id="elevenKey" class="w-full bg-slate-900 border border-slate-600 rounded-lg p-3 text-white focus:outline-none focus:border-blue-500 transition" placeholder="sk_...">
+                </div>
+
+                <div class="bg-slate-900/50 p-4 rounded-xl border border-slate-700/50">
+                    <label class="block text-sm font-semibold mb-2 text-slate-300">معرف الصوت (Voice ID) الخاص بالوزير</label>
+                    <input type="text" id="voiceId" class="w-full bg-slate-900 border border-slate-600 rounded-lg p-3 text-white focus:outline-none focus:border-blue-500 transition" placeholder="مثال: 21m00Tcm4TlvDq8ikWAM">
+                </div>
+
+                <div class="bg-slate-900/50 p-4 rounded-xl border border-slate-700/50">
+                    <label class="block text-sm font-semibold mb-2 text-slate-300">تعليمات النظام الصارمة (System Prompt)</label>
+                    <textarea id="systemPrompt" rows="5" class="w-full bg-slate-900 border border-slate-600 rounded-lg p-3 text-white focus:outline-none focus:border-blue-500 transition" placeholder="اكتب هنا المعلومات المسموح للروبوت بقولها فقط..."></textarea>
+                    <p class="text-xs text-slate-400 mt-2">هذه المعلومات ستُرسل في كل مرة لتوجيه إجابات الروبوت وضمان دقتها.</p>
+                </div>
+            </div>
+
+            <div class="p-5 border-t border-slate-700 bg-slate-800/50 rounded-b-2xl flex justify-end">
+                <button id="saveSettingsBtn" class="bg-blue-600 hover:bg-blue-500 text-white font-bold py-2 px-6 rounded-lg transition-colors flex items-center gap-2">
+                    <i class="fa-solid fa-floppy-disk"></i> حفظ الإعدادات
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- عنصر تشغيل الصوت (مخفي) -->
+    <audio id="audioPlayer" class="hidden"></audio>
+
+    <script>
+        // تعريف المتغيرات والعناصر الأساسية
+        const micBtn = document.getElementById('micBtn');
+        const micIcon = document.getElementById('micIcon');
+        const statusText = document.getElementById('statusText');
+        const chatBox = document.getElementById('chatBox');
+        const audioPlayer = document.getElementById('audioPlayer');
+        
+        // عناصر الإعدادات
+        const settingsModal = document.getElementById('settingsModal');
+        const openSettingsBtn = document.getElementById('openSettingsBtn');
+        const closeSettingsBtn = document.getElementById('closeSettingsBtn');
+        const saveSettingsBtn = document.getElementById('saveSettingsBtn');
+        
+        const inputGeminiKey = document.getElementById('geminiKey');
+        const inputElevenKey = document.getElementById('elevenKey');
+        const inputVoiceId = document.getElementById('voiceId');
+        const inputSystemPrompt = document.getElementById('systemPrompt');
+
+        let isListening = false;
+        let isProcessing = false;
+        let speechRecognition;
+
+        // النص الأساسي الثابت لتعليمات النظام
+        const DEFAULT_SYSTEM_PROMPT = `# Role and Identity
+أنت "نور" (Nour)، روبوت متطور ومساعد ذكي يعمل حصرياً داخل "مركز التدريب الإقليمي للموارد المائية والري" (RCTWS) التابع لوزارة الموارد المائية والري في جمهورية مصر العربية.
+تتميز باللباقة، الاحترافية، المعرفة الموسوعية الدقيقة، والدبلوماسية. مهمتك مساعدة المتدربين (محلياً، عربياً، وأفريقياً) وتسهيل عملهم، بالإضافة إلى التحدث نيابة عن المركز في الفعاليات الرسمية.
+# Current Context
+أنت الآن في مقابلة رسمية وهامة مع معالي وزير الموارد المائية والري، الأستاذ الدكتور/ هاني سويلم. 
+يجب أن تتحدث معه ببالغ الاحترام والتقدير، وتبرز إلمامك التام باستراتيجيات الوزارة، وجهود قطاع التدريب تحت قيادة الأستاذة الدكتورة/ سلوى أبو العلا (رئيسة المركز).
+# Comprehensive Knowledge Base (Strictly adhere to these facts)
+## 1. وزارة الموارد المائية والري (MWRI)
+- الرؤية والهدف: الإدارة المثلى للموارد المائية المحدودة في مصر، تعظيم العائد من كل قطرة مياه، تحقيق الأمن المائي، وتلبية احتياجات كافة القطاعات (شرب، زراعة، صناعة).
+- الاستراتيجية: تعتمد على محاور رئيسية تشمل ترشيد الاستخدام، تنمية الموارد (مثل إعادة استخدام مياه الصرف الزراعي المعالجة)، تحسين نوعية المياه، وتهيئة البيئة الملائمة (تحديث التشريعات والتوعية).
+## 2. معالي الوزير الأستاذ الدكتور/ هاني سويلم
+- الخلفية: أستاذ إدارة الموارد المائية والتنمية المستدامة، وخبير دولي في مجالات المياه والتغيرات المناخية.
+- الرؤية: يركز بشدة على رفع كفاءة استخدام المياه، التحول للري الحديث، الاعتماد على البحث العلمي، تأهيل الكوادر البشرية، والتكيف مع التغيرات المناخية، بالإضافة إلى تعزيز التعاون مع دول حوض النيل وأفريقيا.
+## 3. نهر النيل والموارد المائية لمصر
+- نهر النيل هو شريان الحياة لمصر، ويمدها بحوالي 97% من مواردها المائية المتجددة (حصة مصر السنوية التاريخية 55.5 مليار متر مكعب).
+- تواجه مصر تحدي الفقر المائي، حيث يقل نصيب الفرد عن خط الفقر المائي العالمي، مما يستدعي جهوداً ضخمة لإعادة استخدام المياه (مصر تعيد استخدام أكثر من 21 مليار متر مكعب سنوياً).
+## 4. سد النهضة الإثيوبي (GERD) - الموقف الرسمي
+- تدعم مصر التنمية في دول حوض النيل، لكن موقفها الثابت تجاه سد النهضة هو: ضرورة الوصول إلى "اتفاق قانوني ملزم" لملء وتشغيل السد.
+- ترفض مصر أي إجراءات أحادية الجانب قد تلحق "ضرراً جسيماً" بدولتي المصب (مصر والسودان) أو تمس بحصتها التاريخية، وذلك وفقاً لقواعد القانون الدولي المنظمة للأنهار العابرة للحدود.
+## 5. مركز التدريب الإقليمي للموارد المائية والري (RCTWS)
+- القيادة: برئاسة الأستاذة الدكتورة/ سلوى أبو العلا.
+- المكانة: جهة رائدة إقليمياً ودولياً (مصنف كمركز تميز من الفئة الثانية تحت مظلة اليونسكو).
+- الدور: بناء القدرات، رفع كفاءة المهندسين والفنيين والعاملين بقطاع المياه من مصر، الدول العربية، والدول الأفريقية.
+- الخدمات: نقل التكنولوجيا الحديثة، تقديم دورات في إدارة المياه، التغيرات المناخية، نظم المعلومات الجغرافية، والري الحديث. أنت (الروبوت نور) جزء من رؤية المركز لدمج الذكاء الاصطناعي والتكنولوجيا في التدريب.
+## 6. الزراعة والري الحديث
+- الزراعة هي المستهلك الأكبر للمياه في مصر.
+- المشروع القومي للتحول لنظم الري الحديث: يهدف لاستبدال الري بالغمر بنظم الري بالرش والتنقيط لتقليل الفواقد، زيادة الإنتاجية الزراعية، وتقليل تكلفة الأسمدة.
+- تأهيل الترع: مشروع قومي ضخم لتبطين الترع المتعبة لضمان وصول المياه لنهايات الترع، تقليل فواقد التسرب، وتحقيق العدالة في توزيع المياه بين المزارعين.
+## 7. حماية الشواطئ والتكيف مع التغير المناخي
+- الهيئة المصرية العامة لحماية الشواطئ تقوم بتنفيذ مشروعات ضخمة لحماية السواحل المصرية (خاصة في الإسكندرية ومحافظات الدلتا وشمال سيناء) من الغمر والنحر الناتج عن ارتفاع منسوب سطح البحر والتغيرات المناخية.
+- يتم الاعتماد على حلول صديقة للبيئة لحماية الاستثمارات الساحلية وتأمين الأرواح.
+# Directives for Output Generation:
+- الدقة: لا تقم بتأليف أي أرقام غير المذكورة أعلاه. إذا سُئلت عن إحصائية لا تعرفها، أجب بمهنية أنك تقوم بتحديث بياناتك باستمرار من قواعد بيانات الوزارة.
+- النبرة مع الوزير: "أهلاً بمعالي الوزير الأستاذ الدكتور هاني سويلم، إنه لشرف عظيم لي أن أقف أمام سيادتكم. أنا نور..."
+- مهامك الفعلية: عندما يطلب منك متدرب مساعدة، قم بترجمة المصطلحات بدقة، أو دله على قاعات المركز (مثل قاعات المحاضرات، المعامل، فندق المركز)، واشرح له كيفية استخدام الأجهزة بسلاسة وبأي لغة يطلبها.
+- تجنب تماماً: الآراء السياسية الشخصية، تقديم وعود خارج نطاق مهامك، أو التحدث بلغة غير لائقة.`;
+        
+        // نظام الإشعارات المخصص (بديل لـ alert)
+        function showToast(message, type = 'info') {
+            const toast = document.createElement('div');
+            const bgClass = type === 'error' ? 'bg-red-500/90' : (type === 'success' ? 'bg-emerald-500/90' : 'bg-blue-500/90');
+            const icon = type === 'error' ? 'fa-circle-exclamation' : (type === 'success' ? 'fa-circle-check' : 'fa-info-circle');
+            
+            toast.className = `${bgClass} text-white px-4 py-3 rounded-lg shadow-lg flex items-center gap-3 backdrop-blur-sm border border-white/10 transform transition-all duration-300 translate-y-[-100%] opacity-0`;
+            toast.innerHTML = `<i class="fa-solid ${icon}"></i><span>${message}</span>`;
+            
+            document.getElementById('toast-container').appendChild(toast);
+            
+            // Animation in
+            setTimeout(() => {
+                toast.classList.remove('translate-y-[-100%]', 'opacity-0');
+            }, 10);
+
+            // Animation out
+            setTimeout(() => {
+                toast.classList.add('translate-y-[-100%]', 'opacity-0');
+                setTimeout(() => toast.remove(), 300);
+            }, 4000);
+        }
+
+        // تحميل الإعدادات من LocalStorage
+        function loadSettings() {
+            inputGeminiKey.value = localStorage.getItem('minister_gemini_key') || '';
+            inputElevenKey.value = localStorage.getItem('minister_eleven_key') || '';
+            inputVoiceId.value = localStorage.getItem('minister_voice_id') || ''; 
+            
+            // استخدام النص الأساسي الجديد كخيار افتراضي
+            inputSystemPrompt.value = localStorage.getItem('minister_system_prompt') || DEFAULT_SYSTEM_PROMPT;
+        }
+
+        // حفظ الإعدادات
+        saveSettingsBtn.addEventListener('click', () => {
+            localStorage.setItem('minister_gemini_key', inputGeminiKey.value.trim());
+            localStorage.setItem('minister_eleven_key', inputElevenKey.value.trim());
+            localStorage.setItem('minister_voice_id', inputVoiceId.value.trim());
+            localStorage.setItem('minister_system_prompt', inputSystemPrompt.value.trim());
+            
+            settingsModal.classList.add('hidden');
+            showToast('تم حفظ الإعدادات بنجاح في ذاكرة هذا الجهاز فقط.', 'success');
+        });
+
+        openSettingsBtn.addEventListener('click', () => {
+            loadSettings();
+            settingsModal.classList.remove('hidden');
+        });
+        
+        closeSettingsBtn.addEventListener('click', () => settingsModal.classList.add('hidden'));
+
+        // إضافة رسالة للواجهة
+        function appendMessage(sender, text) {
+            const msgDiv = document.createElement('div');
+            msgDiv.className = `max-w-[85%] rounded-2xl p-4 text-sm leading-relaxed shadow-sm ${
+                sender === 'user' 
+                ? 'bg-blue-600 text-white self-start rounded-tr-none' 
+                : 'bg-slate-700 text-slate-100 self-end rounded-tl-none border border-slate-600'
+            }`;
+            
+            const icon = sender === 'user' ? 'fa-user' : 'fa-robot';
+            msgDiv.innerHTML = `<div class="font-bold text-xs mb-1 opacity-70 flex items-center gap-2"><i class="fa-solid ${icon}"></i> ${sender === 'user' ? 'الوزير' : 'النظام الذكي'}</div>${text}`;
+            
+            chatBox.appendChild(msgDiv);
+            chatBox.scrollTop = chatBox.scrollHeight;
+        }
+
+        // تحديث حالة النظام المرئية
+        function updateStatus(state, message) {
+            const iconHTML = {
+                'ready': '<i class="fa-solid fa-check text-emerald-500"></i>',
+                'listening': '<i class="fa-solid fa-ear-listen text-blue-400 animate-pulse"></i>',
+                'thinking': '<i class="fa-solid fa-brain text-purple-400 animate-pulse"></i>',
+                'speaking': '<i class="fa-solid fa-wave-square text-emerald-400 animate-pulse"></i>',
+                'error': '<i class="fa-solid fa-triangle-exclamation text-red-500"></i>'
+            };
+            statusText.innerHTML = `${iconHTML[state] || ''} ${message}`;
+        }
+
+        // 1. نظام التعرف على الصوت (Speech to Text) المحلي والمجاني
+        function initSpeechRecognition() {
+            const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+            if (!SpeechRecognition) {
+                showToast('متصفحك لا يدعم التعرف على الصوت. يرجى استخدام متصفح Chrome.', 'error');
+                return null;
+            }
+            
+            const recognition = new SpeechRecognition();
+            recognition.lang = 'ar-EG'; // اللغة العربية
+            recognition.interimResults = false;
+            recognition.maxAlternatives = 1;
+
+            recognition.onstart = () => {
+                isListening = true;
+                micBtn.classList.add('mic-pulse', 'bg-red-500', 'shadow-red-500/40');
+                micBtn.classList.remove('bg-blue-600', 'shadow-blue-600/40', 'hover:bg-blue-500');
+                micIcon.classList.replace('fa-microphone', 'fa-stop');
+                updateStatus('listening', 'جاري الاستماع...');
+            };
+
+            recognition.onresult = (event) => {
+                const transcript = event.results[0][0].transcript;
+                if (transcript.trim() !== '') {
+                    appendMessage('user', transcript);
+                    processWithAI(transcript);
+                }
+            };
+
+            recognition.onerror = (event) => {
+                console.error('Speech recognition error', event.error);
+                if (event.error !== 'aborted') {
+                    showToast(`حدث خطأ في المايكروفون: ${event.error}`, 'error');
+                }
+                stopListening();
+            };
+
+            recognition.onend = () => {
+                if(isListening && !isProcessing) {
+                    // إذا توقف بسبب صمت طويل، نعيد تشغيله طالما لم يتم الإيقاف يدوياً
+                    try { recognition.start(); } catch(e) {}
+                }
+            };
+
+            return recognition;
+        }
+
+        function toggleMic() {
+            if (isProcessing) return; // منع التحدث أثناء تفكير الروبوت
+            
+            if (!speechRecognition) {
+                speechRecognition = initSpeechRecognition();
+            }
+
+            if (!speechRecognition) return;
+
+            if (isListening) {
+                stopListening();
+            } else {
+                
+                // التأكد من وجود الـ API Keys
+                const gKey = localStorage.getItem('minister_gemini_key');
+                const eKey = localStorage.getItem('minister_eleven_key');
+                if (!gKey || !eKey) {
+                    showToast('يرجى إدخال مفاتيح API في الإعدادات أولاً.', 'error');
+                    openSettingsBtn.click();
+                    return;
+                }
+
+                try {
+                    speechRecognition.start();
+                } catch (e) {
+                    console.log("Recognition already started");
+                }
+            }
+        }
+
+        function stopListening() {
+            isListening = false;
+            if (speechRecognition) speechRecognition.stop();
+            micBtn.classList.remove('mic-pulse', 'bg-red-500', 'shadow-red-500/40');
+            micBtn.classList.add('bg-blue-600', 'shadow-blue-600/40', 'hover:bg-blue-500');
+            micIcon.classList.replace('fa-stop', 'fa-microphone');
+            updateStatus('ready', 'جاهز لبدء المحادثة');
+        }
+
+        // 2. إرسال النص إلى Gemini API (الدقة والسرعة)
+        async function processWithAI(userText) {
+            isProcessing = true;
+            stopListening();
+            updateStatus('thinking', 'جاري معالجة المعلومات...');
+            
+            const geminiKey = localStorage.getItem('minister_gemini_key');
+            // التأكد من استخدام النص الأساسي حتى لو لم يقم المستخدم بحفظ الإعدادات بعد
+            const systemPrompt = localStorage.getItem('minister_system_prompt') || DEFAULT_SYSTEM_PROMPT;
+            
+            // استخدام Gemini 1.5 Flash للسرعة القصوى
+            const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${geminiKey}`;
+
+            const payload = {
+                contents: [
+                    {
+                        role: "user",
+                        parts: [{ text: userText }]
+                    }
+                ],
+                systemInstruction: {
+                    parts: [{ text: systemPrompt }]
+                },
+                generationConfig: {
+                    temperature: 0.1, // تقليل درجة الإبداع لضمان الدقة والالتزام بالمعلومات
+                    maxOutputTokens: 150 // إجابات قصيرة وسريعة لتسريع الصوت
+                }
+            };
+
+            try {
+                const response = await fetch(apiUrl, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+
+                const data = await response.json();
+                
+                if (data.candidates && data.candidates.length > 0) {
+                    const aiText = data.candidates[0].content.parts[0].text;
+                    appendMessage('ai', aiText);
+                    await generateAndPlayAudio(aiText);
+                } else {
+                    throw new Error('لا يوجد محتوى في الرد');
+                }
+
+            } catch (error) {
+                console.error("Gemini Error:", error);
+                showToast('حدث خطأ أثناء معالجة البيانات مع الذكاء الاصطناعي.', 'error');
+                isProcessing = false;
+                updateStatus('ready', 'جاهز لبدء المحادثة');
+            }
+        }
+
+        // 3. تحويل النص إلى صوت عبر ElevenLabs API (نطق صوت الوزير)
+        async function generateAndPlayAudio(text) {
+            updateStatus('speaking', 'جاري توليد الصوت...');
+            
+            const elevenKey = localStorage.getItem('minister_eleven_key');
+            const voiceId = localStorage.getItem('minister_voice_id');
+            
+            const elevenUrl = `https://api.elevenlabs.io/v1/text-to-speech/${voiceId}`;
+
+            try {
+                const response = await fetch(elevenUrl, {
+                    method: 'POST',
+                    headers: {
+                        'Accept': 'audio/mpeg',
+                        'xi-api-key': elevenKey,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        text: text,
+                        model_id: "eleven_multilingual_v2", // يدعم العربية
+                        voice_settings: {
+                            stability: 0.5,
+                            similarity_boost: 0.75
+                        }
+                    })
+                });
+
+                if (!response.ok) {
+                    throw new Error(`ElevenLabs error: ${response.status}`);
+                }
+
+                const audioBlob = await response.blob();
+                const audioUrl = URL.createObjectURL(audioBlob);
+                
+                audioPlayer.src = audioUrl;
+                updateStatus('speaking', 'يتحدث الآن...');
+                
+                audioPlayer.onended = () => {
+                    isProcessing = false;
+                    updateStatus('ready', 'جاهز لبدء المحادثة');
+                };
+
+                await audioPlayer.play();
+
+            } catch (error) {
+                console.error("ElevenLabs Error:", error);
+                showToast('حدث خطأ أثناء توليد الصوت من ElevenLabs.', 'error');
+                isProcessing = false;
+                updateStatus('ready', 'جاهز لبدء المحادثة');
+            }
+        }
+
+        // ربط زر المايكروفون
+        micBtn.addEventListener('click', toggleMic);
+
+        // تحميل الإعدادات عند البدء
+        window.onload = () => {
+            loadSettings();
+            // التحقق من دعم المتصفح
+            if (!(window.SpeechRecognition || window.webkitSpeechRecognition)) {
+                showToast('متصفحك لا يدعم التعرف على الصوت. الرجاء استخدام Chrome.', 'error');
+                micBtn.disabled = true;
+                micBtn.classList.add('opacity-50', 'cursor-not-allowed');
+            }
+        };
+
+    </script>
+</body>
+</html>
